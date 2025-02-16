@@ -1,7 +1,27 @@
 # Sprint02Tasks - Task Management Application
 
 ## Description
-Sprint02Tasks is a robust task management application built with C# that allows users to create, manage, and track tasks efficiently. The application provides a user-friendly interface for task management with features like task status tracking, priority management, and categorization.
+Sprint02Tasks is a robust task management application built with C# that implements clean architecture and design patterns. The application provides a comprehensive task management system with features like task status tracking, priority management, and categorization.
+
+## Architecture & Design Patterns
+
+### Repository Pattern
+- `ITaskRepository` interface defines the contract for task operations
+- Implementation in `TaskRepository` class provides data access logic
+- Separates business logic from data access concerns
+- Enables easy switching between different data storage implementations
+
+### Unit of Work Pattern
+- `IUnitOfWork` interface manages transactions and data persistence
+- Ensures data consistency across operations
+- Provides transaction management with Begin/Commit/Rollback capabilities
+- Centralizes data access through repository management
+
+### DTO Pattern
+- `TaskDTO` handles data transfer between layers
+- Separates domain models from data transfer objects
+- Provides clean data contracts for external communication
+- Reduces coupling between layers
 
 ## Features
 - Create new tasks with descriptions
@@ -13,41 +33,26 @@ Sprint02Tasks is a robust task management application built with C# that allows 
 - Task validation (minimum description length)
 - Due date management
 - Persistent storage using JSON
+- Transaction management
+- Thread-safe operations
 
 ## Project Structure
 ```
 Sprint02Tasks/
-├── Program.cs              # Application entry point
-├── TaskItem.cs            # Task model definition
-├── TaskRepository.cs      # Data persistence and task operations
-├── tasks.json            # Task storage file
-└── Tests/                # Unit tests directory
-    ├── TaskItemTests.cs     # Tests for TaskItem class
-    └── TaskRepositoryTests.cs # Tests for TaskRepository class
+├── DTOs/
+│   └── TaskDTO.cs              # Data Transfer Objects
+├── Infrastructure/
+│   ├── TaskRepository.cs       # Repository implementation
+│   └── UnitOfWork.cs          # Unit of Work implementation
+├── Interfaces/
+│   ├── ITaskRepository.cs     # Repository interface
+│   └── IUnitOfWork.cs        # Unit of Work interface
+├── Program.cs                 # Application entry point
+├── TaskItem.cs               # Domain model
+└── Tests/                    # Unit tests directory
+    ├── TaskItemTests.cs      # Tests for TaskItem
+    └── TaskRepositoryTests.cs # Tests for TaskRepository
 ```
-
-## Classes
-
-### TaskItem
-Represents a single task with properties:
-- Id: Unique identifier
-- Description: Task description (10-100 characters)
-- Status: Current task status
-- Priority: Task priority level
-- Categories: List of task categories
-- CreationDate: When the task was created
-- LastModifiedDate: Last modification timestamp
-- DueDate: Optional due date
-
-### TaskRepository
-Handles task data management:
-- AddTask: Creates new tasks
-- UpdateTaskStatus: Changes task status
-- UpdateTaskPriority: Modifies task priority
-- AddTaskCategory: Adds categories to tasks
-- DeleteTask: Removes tasks
-- FindTask: Retrieves specific tasks
-- ListTasks: Returns filtered task lists
 
 ## Requirements
 - .NET 6.0 or higher
@@ -60,26 +65,56 @@ Handles task data management:
 3. Restore NuGet packages
 4. Build the solution
 
-## Usage
+## Usage Example
 ```csharp
-// Create a new task repository
-var repository = new TaskRepository();
+// Using Unit of Work pattern
+using (IUnitOfWork unitOfWork = new UnitOfWork())
+{
+    try
+    {
+        // Begin transaction
+        unitOfWork.BeginTransaction();
 
-// Add a new task
-repository.AddTask(
-    description: "Complete project documentation",
-    status: TaskStatus.Pending,
-    priority: Priority.Alta,
-    dueDate: DateTime.Now.AddDays(7),
-    categories: new List<string> { "Documentation", "Important" }
-);
+        // Create a new task using DTO
+        var taskDto = new TaskDTO
+        {
+            Description = "Complete project documentation",
+            Status = TaskStatus.Pending,
+            Priority = Priority.Alta,
+            DueDate = DateTime.Now.AddDays(7)
+        };
 
-// Update task status
-repository.UpdateTaskStatus(taskId: 1, status: TaskStatus.Completed);
+        // Add task through repository
+        unitOfWork.TaskRepository.Add(taskDto);
 
-// List all pending tasks
-var pendingTasks = repository.ListTasks(statusFilter: TaskStatus.Pending);
+        // Commit transaction and save changes
+        unitOfWork.CommitTransaction();
+        unitOfWork.SaveChanges();
+    }
+    catch (Exception)
+    {
+        // Rollback on error
+        unitOfWork.RollbackTransaction();
+        throw;
+    }
+}
 ```
+
+## Design Patterns Benefits
+1. **Repository Pattern**
+   - Centralizes data access logic
+   - Enables unit testing with mock repositories
+   - Provides consistent data access interface
+
+2. **Unit of Work Pattern**
+   - Maintains data consistency
+   - Manages transactions
+   - Groups related operations
+
+3. **DTO Pattern**
+   - Reduces over-posting vulnerabilities
+   - Separates domain logic from data transfer
+   - Provides clear contracts for data exchange
 
 ## Testing
 The project includes comprehensive unit tests using MSTest framework:
@@ -120,14 +155,17 @@ The application includes robust error handling for:
 - File I/O operations
 - Data validation
 - Concurrent access to task data
+- Transaction management
 
 ## Best Practices
 - SOLID principles implementation
 - Clean Code architecture
+- Design patterns usage
 - Comprehensive unit testing
 - Exception handling
 - Data validation
 - Thread-safe operations
+- Transaction management
 
 ## Contributing
 1. Fork the repository
