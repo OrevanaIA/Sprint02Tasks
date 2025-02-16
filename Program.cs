@@ -1,80 +1,100 @@
 ﻿﻿using System;
+using Microsoft.Extensions.DependencyInjection;
 using Sprint02Tasks.DTOs;
 using Sprint02Tasks.Infrastructure;
 using Sprint02Tasks.Interfaces;
+using Sprint02Tasks.Services;
 
 namespace Sprint02Tasks
 {
     class Program
     {
+        private static IServiceProvider _serviceProvider;
+
         static void Main(string[] args)
         {
-            using (IUnitOfWork unitOfWork = new UnitOfWork())
+            ConfigureServices();
+            
+            using (var scope = _serviceProvider.CreateScope())
             {
-                bool exit = false;
-                while (!exit)
+                var taskService = scope.ServiceProvider.GetRequiredService<ITaskService>();
+                RunApplication(taskService);
+            }
+
+            DisposeServices();
+        }
+
+        private static void ConfigureServices()
+        {
+            var services = new ServiceCollection();
+
+            // Register services
+            services.AddSingleton<IUnitOfWork, UnitOfWork>();
+            services.AddScoped<ITaskService, TaskService>();
+            services.AddScoped<ITaskValidator, TaskValidator>();
+
+            _serviceProvider = services.BuildServiceProvider();
+        }
+
+        private static void RunApplication(ITaskService taskService)
+        {
+            bool exit = false;
+            while (!exit)
+            {
+                Console.WriteLine("\nTask Manager");
+                Console.WriteLine("1. Add Task");
+                Console.WriteLine("2. List Tasks");
+                Console.WriteLine("3. Update Task Status");
+                Console.WriteLine("4. Delete Task");
+                Console.WriteLine("5. Add Category to Task");
+                Console.WriteLine("6. Update Task Priority");
+                Console.WriteLine("7. Search Tasks");
+                Console.WriteLine("8. Exit");
+                Console.Write("Select an option: ");
+
+                string option = Console.ReadLine();
+
+                try
                 {
-                    Console.WriteLine("\nTask Manager");
-                    Console.WriteLine("1. Add Task");
-                    Console.WriteLine("2. List Tasks");
-                    Console.WriteLine("3. Update Task Status");
-                    Console.WriteLine("4. Delete Task");
-                    Console.WriteLine("5. Add Category to Task");
-                    Console.WriteLine("6. Update Task Priority");
-                    Console.WriteLine("7. Search Tasks");
-                    Console.WriteLine("8. Exit");
-                    Console.Write("Select an option: ");
-
-                    string option = Console.ReadLine();
-
-                    try
+                    switch (option)
                     {
-                        unitOfWork.BeginTransaction();
-
-                        switch (option)
-                        {
-                            case "1":
-                                AddTask(unitOfWork);
-                                break;
-                            case "2":
-                                ListTasks(unitOfWork);
-                                break;
-                            case "3":
-                                UpdateTaskStatus(unitOfWork);
-                                break;
-                            case "4":
-                                DeleteTask(unitOfWork);
-                                break;
-                            case "5":
-                                AddCategoryToTask(unitOfWork);
-                                break;
-                            case "6":
-                                UpdateTaskPriority(unitOfWork);
-                                break;
-                            case "7":
-                                SearchTasks(unitOfWork);
-                                break;
-                            case "8":
-                                exit = true;
-                                break;
-                            default:
-                                Console.WriteLine("Invalid option");
-                                break;
-                        }
-
-                        unitOfWork.CommitTransaction();
-                        unitOfWork.SaveChanges();
+                        case "1":
+                            AddTask(taskService);
+                            break;
+                        case "2":
+                            ListTasks(taskService);
+                            break;
+                        case "3":
+                            UpdateTaskStatus(taskService);
+                            break;
+                        case "4":
+                            DeleteTask(taskService);
+                            break;
+                        case "5":
+                            AddCategoryToTask(taskService);
+                            break;
+                        case "6":
+                            UpdateTaskPriority(taskService);
+                            break;
+                        case "7":
+                            SearchTasks(taskService);
+                            break;
+                        case "8":
+                            exit = true;
+                            break;
+                        default:
+                            Console.WriteLine("Invalid option");
+                            break;
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error: {ex.Message}");
-                        unitOfWork.RollbackTransaction();
-                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error: {ex.Message}");
                 }
             }
         }
 
-        static void AddTask(IUnitOfWork unitOfWork)
+        private static void AddTask(ITaskService taskService)
         {
             Console.Write("Enter task description: ");
             string description = Console.ReadLine();
@@ -115,13 +135,13 @@ namespace Sprint02Tasks
                 LastModifiedDate = DateTime.Now
             };
 
-            unitOfWork.TaskRepository.Add(taskDto);
+            taskService.CreateTask(taskDto);
             Console.WriteLine("Task added successfully");
         }
 
-        static void ListTasks(IUnitOfWork unitOfWork)
+        private static void ListTasks(ITaskService taskService)
         {
-            var tasks = unitOfWork.TaskRepository.GetAll();
+            var tasks = taskService.GetAllTasks();
             foreach (var task in tasks)
             {
                 Console.WriteLine($"\nID: {task.Id}");
@@ -137,7 +157,7 @@ namespace Sprint02Tasks
             }
         }
 
-        static void UpdateTaskStatus(IUnitOfWork unitOfWork)
+        private static void UpdateTaskStatus(ITaskService taskService)
         {
             Console.Write("Enter task ID: ");
             if (int.TryParse(Console.ReadLine(), out int id))
@@ -155,7 +175,7 @@ namespace Sprint02Tasks
                     _ => TaskStatus.Pending
                 };
 
-                unitOfWork.TaskRepository.UpdateStatus(id, status);
+                taskService.UpdateTaskStatus(id, status);
                 Console.WriteLine("Task status updated successfully");
             }
             else
@@ -164,12 +184,12 @@ namespace Sprint02Tasks
             }
         }
 
-        static void DeleteTask(IUnitOfWork unitOfWork)
+        private static void DeleteTask(ITaskService taskService)
         {
             Console.Write("Enter task ID: ");
             if (int.TryParse(Console.ReadLine(), out int id))
             {
-                unitOfWork.TaskRepository.Delete(id);
+                taskService.DeleteTask(id);
                 Console.WriteLine("Task deleted successfully");
             }
             else
@@ -178,14 +198,14 @@ namespace Sprint02Tasks
             }
         }
 
-        static void AddCategoryToTask(IUnitOfWork unitOfWork)
+        private static void AddCategoryToTask(ITaskService taskService)
         {
             Console.Write("Enter task ID: ");
             if (int.TryParse(Console.ReadLine(), out int id))
             {
                 Console.Write("Enter category name: ");
                 string category = Console.ReadLine();
-                unitOfWork.TaskRepository.AddCategory(id, category);
+                taskService.AddCategoryToTask(id, category);
                 Console.WriteLine("Category added successfully");
             }
             else
@@ -194,7 +214,7 @@ namespace Sprint02Tasks
             }
         }
 
-        static void UpdateTaskPriority(IUnitOfWork unitOfWork)
+        private static void UpdateTaskPriority(ITaskService taskService)
         {
             Console.Write("Enter task ID: ");
             if (int.TryParse(Console.ReadLine(), out int id))
@@ -212,7 +232,7 @@ namespace Sprint02Tasks
                     _ => Priority.Media
                 };
 
-                unitOfWork.TaskRepository.UpdatePriority(id, priority);
+                taskService.UpdateTaskPriority(id, priority);
                 Console.WriteLine("Task priority updated successfully");
             }
             else
@@ -221,11 +241,11 @@ namespace Sprint02Tasks
             }
         }
 
-        static void SearchTasks(IUnitOfWork unitOfWork)
+        private static void SearchTasks(ITaskService taskService)
         {
             Console.Write("Enter search term: ");
             string searchTerm = Console.ReadLine();
-            var tasks = unitOfWork.TaskRepository.Search(searchTerm);
+            var tasks = taskService.SearchTasks(searchTerm);
             foreach (var task in tasks)
             {
                 Console.WriteLine($"\nID: {task.Id}");
@@ -233,6 +253,14 @@ namespace Sprint02Tasks
                 Console.WriteLine($"Status: {task.Status}");
                 Console.WriteLine($"Priority: {task.Priority}");
                 Console.WriteLine("------------------------");
+            }
+        }
+
+        private static void DisposeServices()
+        {
+            if (_serviceProvider is IDisposable disposable)
+            {
+                disposable.Dispose();
             }
         }
     }
