@@ -1,6 +1,8 @@
 using System;
+using System.Threading.Tasks;
 using Sprint02Tasks.DTOs;
 using Sprint02Tasks.Interfaces;
+using Sprint02Tasks.Security;
 
 namespace Sprint02Tasks.Services
 {
@@ -9,73 +11,110 @@ namespace Sprint02Tasks.Services
         private const int MinDescriptionLength = 10;
         private const int MaxDescriptionLength = 100;
 
-        public void ValidateTask(TaskDTO task)
+        public async Task ValidateTaskAsync(TaskDTO task)
         {
             if (task == null)
             {
                 throw new ArgumentNullException(nameof(task));
             }
 
-            ValidateDescription(task.Description);
-            ValidateStatus(task.Status);
-            ValidatePriority(task.Priority);
+            // Sanitizar y validar la descripción
+            task.Description = InputSanitizer.SanitizeTaskDescription(task.Description);
+            await ValidateDescriptionAsync(task.Description);
 
+            // Validar estado y prioridad
+            await ValidateStatusAsync(task.Status);
+            await ValidatePriorityAsync(task.Priority);
+
+            // Sanitizar y validar categorías
             if (task.Categories != null)
             {
-                foreach (var category in task.Categories)
+                for (int i = 0; i < task.Categories.Count; i++)
                 {
-                    ValidateCategory(category);
+                    task.Categories[i] = InputSanitizer.SanitizeCategory(task.Categories[i]);
+                    await ValidateCategoryAsync(task.Categories[i]);
                 }
             }
 
+            // Validar fecha límite
             if (task.DueDate.HasValue && task.DueDate.Value < DateTime.Now.Date)
             {
                 throw new ArgumentException("Due date cannot be in the past");
             }
+
+            // Actualizar fecha de última modificación
+            task.LastModifiedDate = DateTime.UtcNow;
         }
 
-        public void ValidateDescription(string description)
+        public async Task ValidateDescriptionAsync(string description)
         {
-            if (string.IsNullOrWhiteSpace(description))
+            await Task.Run(() =>
             {
-                throw new ArgumentException("Description cannot be empty", nameof(description));
-            }
+                if (string.IsNullOrWhiteSpace(description))
+                {
+                    throw new ArgumentException("Description cannot be empty", nameof(description));
+                }
 
-            if (description.Length < MinDescriptionLength || description.Length > MaxDescriptionLength)
-            {
-                throw new ArgumentException(
-                    $"Description must be between {MinDescriptionLength} and {MaxDescriptionLength} characters",
-                    nameof(description));
-            }
+                var sanitizedDescription = InputSanitizer.SanitizeTaskDescription(description);
+
+                if (sanitizedDescription.Length < MinDescriptionLength || sanitizedDescription.Length > MaxDescriptionLength)
+                {
+                    throw new ArgumentException(
+                        $"Description must be between {MinDescriptionLength} and {MaxDescriptionLength} characters",
+                        nameof(description));
+                }
+            });
         }
 
-        public void ValidateStatus(TaskStatus status)
+        public async Task ValidateStatusAsync(TaskStatus status)
         {
-            if (!Enum.IsDefined(typeof(TaskStatus), status))
+            await Task.Run(() =>
             {
-                throw new ArgumentException("Invalid task status", nameof(status));
-            }
+                if (!Enum.IsDefined(typeof(TaskStatus), status))
+                {
+                    throw new ArgumentException("Invalid task status", nameof(status));
+                }
+            });
         }
 
-        public void ValidatePriority(Priority priority)
+        public async Task ValidatePriorityAsync(Priority priority)
         {
-            if (!Enum.IsDefined(typeof(Priority), priority))
+            await Task.Run(() =>
             {
-                throw new ArgumentException("Invalid priority level", nameof(priority));
-            }
+                if (!Enum.IsDefined(typeof(Priority), priority))
+                {
+                    throw new ArgumentException("Invalid priority level", nameof(priority));
+                }
+            });
         }
 
-        public void ValidateCategory(string category)
+        public async Task ValidateCategoryAsync(string category)
         {
-            if (string.IsNullOrWhiteSpace(category))
+            await Task.Run(() =>
             {
-                throw new ArgumentException("Category cannot be empty", nameof(category));
-            }
+                if (string.IsNullOrWhiteSpace(category))
+                {
+                    throw new ArgumentException("Category cannot be empty", nameof(category));
+                }
 
-            if (category.Length > 50)
-            {
-                throw new ArgumentException("Category name cannot exceed 50 characters", nameof(category));
-            }
+                var sanitizedCategory = InputSanitizer.SanitizeCategory(category);
+
+                if (string.IsNullOrWhiteSpace(sanitizedCategory))
+                {
+                    throw new ArgumentException("Category contains no valid characters after sanitization", nameof(category));
+                }
+
+                if (sanitizedCategory.Length > 50)
+                {
+                    throw new ArgumentException("Category name cannot exceed 50 characters", nameof(category));
+                }
+
+                // Verificar que la categoría solo contenga caracteres válidos después de la sanitización
+                if (!System.Text.RegularExpressions.Regex.IsMatch(sanitizedCategory, @"^[a-zA-Z0-9\s\-]+$"))
+                {
+                    throw new ArgumentException("Category can only contain letters, numbers, spaces, and hyphens", nameof(category));
+                }
+            });
         }
     }
 }
